@@ -2711,6 +2711,11 @@ namespace RepRecorder
             Dictionary<string, object> shot = new Dictionary<string, object>();
             try { shot["video"] = obs.Request("GetVideoSettings", null); }
             catch (Exception ex) { Log.Write("OBS 快照：读画面设置失败（这一批不还原画布）：" + ex.Message); }
+            // 节目场景也要记：程序录制时会把节目场景切到它自己的「RepRecorder 录制场景」，
+            // 正常收尾 SwitchScene(false) 会切回来；但被强杀就不会 —— 用户打开 OBS 只看到黑乎乎的游戏窗口场景
+            // （2026-10-18 用户实际撞到）。记进快照就能在"下次连上 OBS"时一起还回来。
+            try { shot["scene"] = Convert.ToString(obs.Request("GetSceneList", null)["currentProgramSceneName"]); }
+            catch { }
             List<object> items = new List<object>();
             try
             {
@@ -2787,6 +2792,16 @@ namespace RepRecorder
                 }
             }
             catch (Exception ex) { Log.Write("OBS 还原：画面设置没还成 —— " + ex.Message); }
+            try
+            {
+                string scene = shot.ContainsKey("scene") ? Convert.ToString(shot["scene"]) : null;
+                if (!string.IsNullOrEmpty(scene))
+                {
+                    obs.Request("SetCurrentProgramScene", new Dictionary<string, object> { { "sceneName", scene } });
+                    Log.Write("OBS 还原：节目场景回「" + scene + "」");
+                }
+            }
+            catch (Exception ex) { Log.Write("OBS 还原：节目场景没还成 —— " + ex.Message); }
             int ok = 0, miss = 0;
             try
             {
